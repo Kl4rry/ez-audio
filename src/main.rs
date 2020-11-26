@@ -106,7 +106,7 @@ impl<'a> Device {
 
 pub fn output_devices(context: &Context) -> Devices {
     unsafe {
-        let capacity =  getAudioDeviceCount(&context.context);
+        let capacity = getAudioDeviceCount(&context.context);
         let mut devices: Vec<AudioDevice> = Vec::with_capacity(capacity);
         let mut ptr = devices.as_mut_ptr();
         let len = getAudioDevices(&context.context, ptr, capacity);
@@ -163,18 +163,18 @@ impl Drop for Context {
     }
 }
 
-pub struct AudioBuffer<'a> {
+pub struct AudioHandle<'a> {
     id: usize,
     path: PathBuf,
     context: &'a Context,
 }
 
-impl<'a> AudioBuffer<'a> {
+impl<'a> AudioHandle<'a> {
     fn load<P: AsRef<Path>>(
         path: P,
         context: &'a Context,
         device: Device,
-    ) -> Result<AudioBuffer, AudioError> {
+    ) -> Result<AudioHandle, AudioError> {
         if metadata(path.as_ref()).is_err() {
             return Err(AudioError::FileError);
         };
@@ -191,7 +191,7 @@ impl<'a> AudioBuffer<'a> {
             );
 
             match result {
-                0 => Ok(AudioBuffer {
+                0 => Ok(AudioHandle {
                     id: id,
                     path: path.as_ref().to_path_buf(),
                     context,
@@ -234,7 +234,7 @@ impl<'a> AudioBuffer<'a> {
     }
 }
 
-impl<'a> Drop for AudioBuffer<'a> {
+impl<'a> Drop for AudioHandle<'a> {
     fn drop(&mut self) {
         unsafe {
             remove(self.id, &self.context.context);
@@ -244,7 +244,7 @@ impl<'a> Drop for AudioBuffer<'a> {
 
 fn main() {
     let context = Context::init().unwrap();
-    let clip = AudioBuffer::load(
+    let clip = AudioHandle::load(
         "Genji_-_Mada_mada!.ogg",
         &context,
         default_output_device(&context),
