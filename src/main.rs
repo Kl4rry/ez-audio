@@ -2,10 +2,10 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::OsStr;
 use std::fs::metadata;
+use std::iter::Iterator;
 use std::os::raw::c_char;
 use std::path::Path;
 use std::path::PathBuf;
-use std::iter::Iterator;
 
 use std::error::Error;
 use std::fmt;
@@ -15,7 +15,7 @@ static mut FREE_ID: Vec<usize> = Vec::new();
 
 fn get_id() -> usize {
     unsafe {
-        FREE_ID.pop().unwrap_or_else(||{
+        FREE_ID.pop().unwrap_or_else(|| {
             let id = NEXT_ID;
             NEXT_ID += 1;
             id
@@ -53,7 +53,11 @@ extern "C" {
     fn reset(id: usize, context: &AudioContext);
 
     fn getDefaultAudioDevice(context: &AudioContext) -> AudioDevice;
-    fn getAudioDevices(context: &AudioContext, devices: *const AudioDevice, capacity: usize) -> usize;
+    fn getAudioDevices(
+        context: &AudioContext,
+        devices: *const AudioDevice,
+        capacity: usize,
+    ) -> usize;
     fn getAudioDeviceCount(context: &AudioContext) -> usize;
 }
 
@@ -109,14 +113,12 @@ pub fn output_devices(context: &Context) -> Devices {
         let capacity = getAudioDeviceCount(&context.context);
         let mut devices: Vec<AudioDevice> = Vec::with_capacity(capacity);
         let mut ptr = devices.as_mut_ptr();
-        let len = getAudioDevices(&context.context, ptr, capacity);
         std::mem::forget(devices);
+        let len = getAudioDevices(&context.context, ptr, capacity);
 
         let devices = Vec::from_raw_parts(ptr, len, capacity);
-        
-        Devices {
-            devices,
-        }
+
+        Devices { devices }
     }
 }
 
@@ -129,9 +131,7 @@ impl<'a> Iterator for Devices {
     fn next(&mut self) -> Option<Self::Item> {
         let option = self.devices.pop();
         if let Some(device) = option {
-            Some(Device{
-                device,
-            })
+            Some(Device { device })
         } else {
             None
         }
