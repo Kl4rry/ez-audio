@@ -14,6 +14,11 @@ struct AudioDevice{
 	const char* name;
 };
 
+struct AudioDeviceList{
+    size_t device_count;
+    AudioDevice* devices;
+};
+
 struct SoundClip{
 	ma_device device;
 	ma_decoder decoder;

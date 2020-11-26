@@ -21,7 +21,9 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 
 extern "C" void removeSound(size_t id, AudioContext* context);
 
-//extern "C" std::vector<AudioDevice> getDeviceList();
+extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, size_t capacity);
+
+extern "C" size_t getAudioDeviceCount(AudioContext* context);
 
 extern "C" void setAudioDevice(size_t id, AudioContext* context, AudioDevice* device);
 

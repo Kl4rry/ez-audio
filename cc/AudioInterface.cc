@@ -88,23 +88,32 @@ extern "C" void removeSound(size_t id, AudioContext* context){
 }
 
 
-/*extern "C" void getDeviceList(AudioDevice devices[], size_t deviceCount){
+extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, size_t capacity){
 	ma_device_info* playbackDeviceInfos;
 	ma_uint32 playbackDeviceCount;
-	std::vector<AudioDevice> deviceList{};
-	if(ma_context_get_devices(&context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
+
+	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
 		std::cout << "Failed to retrieve device information" << std::endl;
+		return 0;
 	}
-	*devices = (AudioDevice)malloc(playbackDeviceCount * sizeof(AudioDevice));
-	//*devices = AudioDevice[playbackDeviceCount];
-	for (ma_uint32 i{0}; i < playbackDeviceCount; ++i) {
-		deviceList.push_back(AudioDevice{
+	ma_uint32 i{0};
+	for (; i < playbackDeviceCount && i < capacity; ++i) {
+		devices[i] = AudioDevice{
 			playbackDeviceInfos[i].id,
 			playbackDeviceInfos[i].name
-		});
+		};
 	}
-	return deviceList;
-}*/
+	return i;
+}
+
+extern "C" size_t getAudioDeviceCount(AudioContext* context){
+	ma_uint32 playbackDeviceCount;
+	if(ma_context_get_devices(context->context, NULL, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
+		std::cout << "Failed to retrieve device information" << std::endl;
+		return 0;
+	}
+	return playbackDeviceCount;
+}
 
 extern "C" void setAudioDevice(size_t id, AudioContext* context, AudioDevice* device){
 	ma_device_info* playbackDeviceInfos;
