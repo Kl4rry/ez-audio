@@ -266,6 +266,7 @@ impl<'a> Drop for AudioHandle<'a> {
     }
 }
 
+/*
 fn main() {
     let context = Context::init().unwrap();
 
@@ -295,3 +296,4 @@ fn main() {
 
     loop {}
 }
+*/
