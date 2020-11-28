@@ -1,2 +1,2 @@
-*.h
-*.c
+*.h linguist-detectable=false
+*.c linguist-detectable=false
