@@ -4,12 +4,15 @@
 #include <iostream>
 #include <functional>
 #include <chrono>
+#include <mutex>
 
 extern "C" AudioContext init();
 
 extern "C" void uninit(AudioContext* context);
 
 extern "C" void setVolume(size_t id, AudioContext* context, float value);
+
+extern "C" float getVolume(size_t id, AudioContext* context);
 
 extern "C" void play(size_t id, AudioContext* context);
 

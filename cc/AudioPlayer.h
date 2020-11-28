@@ -33,6 +33,7 @@ struct AudioContext{
 	ma_context* context;
 	std::unordered_map<size_t, SoundClip*>* soundClips;
 	bool result;
+	std::mutex* mtx;
 };
 
 void data_callback(ma_device* device, void* output, const void* input, ma_uint32 frameCount);

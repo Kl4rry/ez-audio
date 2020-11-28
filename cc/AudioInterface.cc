@@ -5,10 +5,10 @@ extern "C" AudioContext init(){
 	if(ma_context_init(NULL, 0, NULL, context) != MA_SUCCESS){
 		std::cout << "Failed to initialize context" << std::endl;
 		delete context;
-		return AudioContext{nullptr, nullptr, false};
+		return AudioContext{nullptr, nullptr, false, nullptr};
 	}
 
-	return AudioContext{context, new std::unordered_map<size_t, SoundClip*>, true};
+	return AudioContext{context, new std::unordered_map<size_t, SoundClip*>, true, new std::mutex()};
 }
 
 extern "C" void uninit(AudioContext* context){
@@ -20,10 +20,15 @@ extern "C" void uninit(AudioContext* context){
 	delete context->soundClips;
 	ma_context_uninit(context->context);
 	delete context;
+	delete context->mtx;
 }
 
-void setVolume(size_t id, AudioContext* context, float value){
+extern "C" void setVolume(size_t id, AudioContext* context, float value){
 	context->soundClips->at(id)->device.masterVolumeFactor = value;
+}
+
+extern "C" float getVolume(size_t id, AudioContext* context){
+	return context->soundClips->at(id)->device.masterVolumeFactor;
 }
 
 extern "C" void play(size_t id, AudioContext* context){
@@ -75,6 +80,7 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 
 	soundClip->device.masterVolumeFactor = 1;
 
+	std::lock_guard<std::mutex> lock(*context->mtx);
 	context->soundClips->insert({id, soundClip});
 
 	return 0;
@@ -84,6 +90,7 @@ extern "C" void removeSound(size_t id, AudioContext* context){
 	ma_device_uninit(&context->soundClips->at(id)->device);
 	ma_decoder_uninit(&context->soundClips->at(id)->decoder);
 	delete context->soundClips->at(id);
+	std::lock_guard<std::mutex> lock(*context->mtx);
 	context->soundClips->erase(id);
 }
 
@@ -116,6 +123,7 @@ extern "C" size_t getAudioDeviceCount(AudioContext* context){
 }
 
 extern "C" void setAudioDevice(size_t id, AudioContext* context, AudioDevice* device){
+	//std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
 	ma_device_info* playbackDeviceInfos;
 	ma_uint32 playbackDeviceCount;
 	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
