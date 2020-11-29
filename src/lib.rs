@@ -172,7 +172,7 @@ pub struct AudioHandle<'a> {
 }
 
 impl<'a> AudioHandle<'a> {
-    fn load<P: AsRef<Path>>(
+    pub fn load<P: AsRef<Path>>(
         path: P,
         context: &'a Context,
         device: Device,
@@ -205,29 +205,29 @@ impl<'a> AudioHandle<'a> {
         }
     }
 
-    fn play(&self) {
+    pub fn play(&self) {
         unsafe {
             play(self.id, &self.context.context);
         }
     }
 
-    fn stop(&self) {
+    pub fn stop(&self) {
         unsafe {
             stop(self.id, &self.context.context);
         }
     }
 
-    fn reset(&self) {
+    pub fn reset(&self) {
         unsafe {
             reset(self.id, &self.context.context);
         }
     }
 
-    fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         return &self.path;
     }
 
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         self.path
             .file_name()
             .unwrap_or(OsStr::new("Undefined"))
@@ -235,25 +235,25 @@ impl<'a> AudioHandle<'a> {
             .unwrap_or("Undefined")
     }
 
-    fn set_volume(&self, volume: f32) {
+    pub fn set_volume(&self, volume: f32) {
         unsafe {
             setVolume(self.id, &self.context.context, volume);
         }
     }
 
-    fn volume(&self) -> f32 {
+    pub fn volume(&self) -> f32 {
         unsafe { getVolume(self.id, &self.context.context) }
     }
 
-    fn is_playing(&self) -> bool {
+    pub fn is_playing(&self) -> bool {
         unsafe { isPlaying(self.id, &self.context.context) }
     }
 
-    fn is_paused(&self) -> bool {
+    pub fn is_paused(&self) -> bool {
         unsafe { !isPlaying(self.id, &self.context.context) }
     }
 
-    fn duration(&self) -> Duration {
+    pub fn duration(&self) -> Duration {
         unsafe { Duration::from_millis(getDuration(self.id, &self.context.context)) }
     }
 }
