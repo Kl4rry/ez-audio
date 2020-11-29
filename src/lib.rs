@@ -175,8 +175,8 @@ impl<'a> AudioHandle<'a> {
     pub fn load<P: AsRef<Path>>(
         path: P,
         context: &'a Context,
-        device: Device,
-    ) -> Result<AudioHandle, AudioError> {
+        device: &Device,
+    ) -> Result<AudioHandle<'a>, AudioError> {
         if metadata(path.as_ref()).is_err() {
             return Err(AudioError::FileError);
         };
