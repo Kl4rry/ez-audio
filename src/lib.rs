@@ -1,13 +1,10 @@
-use std::ffi::CStr;
-use std::ffi::CString;
-use std::ffi::OsStr;
+use std::ffi::{CStr, CString, OsStr};
 use std::fs::metadata;
 use std::iter::Iterator;
 use std::os::raw::c_char;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use std::error::Error;
@@ -35,28 +32,28 @@ struct AudioContext {
 
 extern "C" {
     fn init() -> AudioContext;
-    fn uninit(context: &AudioContext);
+    fn uninit(context: *const AudioContext);
 
     fn load(
         id: usize,
-        context: &AudioContext,
+        context: *const AudioContext,
         path: *const c_char,
         device: *const AudioDevice,
     ) -> i32;
-    fn remove(id: usize, context: &AudioContext);
+    fn removeSound(id: usize, context: *const AudioContext);
 
-    fn play(id: usize, context: &AudioContext);
-    fn stop(id: usize, context: &AudioContext);
-    fn reset(id: usize, context: &AudioContext);
-    fn setVolume(id: usize, context: &AudioContext, value: f32);
-    fn getVolume(id: usize, context: &AudioContext) -> f32;
+    fn play(id: usize, context: *const AudioContext);
+    fn stop(id: usize, context: *const AudioContext);
+    fn reset(id: usize, context: *const AudioContext);
+    fn setVolume(id: usize, context: *const AudioContext, value: f32);
+    fn getVolume(id: usize, context: *const AudioContext) -> f32;
 
-    fn isPlaying(id: usize, context: &AudioContext) -> bool;
-    fn getDuration(id: usize, context: &AudioContext) -> u64;
+    fn isPlaying(id: usize, context: *const AudioContext) -> bool;
+    fn getDuration(id: usize, context: *const AudioContext) -> u64;
 
-    fn getDefaultAudioDevice(context: &AudioContext) -> AudioDevice;
+    fn getDefaultAudioDevice(context: *const AudioContext) -> AudioDevice;
     fn getAudioDevices(
-        context: &AudioContext,
+        context: *const AudioContext,
         devices: *const AudioDevice,
         capacity: usize,
     ) -> usize;
@@ -92,7 +89,7 @@ impl fmt::Display for AudioError {
 
 pub fn default_output_device(context: &Context) -> Device {
     Device {
-        device: unsafe { getDefaultAudioDevice(&context.context) },
+        device: unsafe { getDefaultAudioDevice(&context.inner.context) },
     }
 }
 
@@ -112,11 +109,11 @@ impl<'a> Device {
 
 pub fn output_devices(context: &Context) -> Devices {
     unsafe {
-        let capacity = getAudioDeviceCount(&context.context);
+        let capacity = getAudioDeviceCount(&context.inner.context);
         let mut devices: Vec<AudioDevice> = Vec::with_capacity(capacity);
         let ptr = devices.as_mut_ptr();
         std::mem::forget(devices);
-        let len = getAudioDevices(&context.context, ptr, capacity);
+        let len = getAudioDevices(&context.inner.context, ptr, capacity);
 
         let devices = Vec::from_raw_parts(ptr, len, capacity);
 
@@ -140,16 +137,25 @@ impl<'a> Iterator for Devices {
     }
 }
 
+struct InnerContext {
+    context: AudioContext
+}
+
+#[derive(Clone)]
 pub struct Context {
-    context: AudioContext,
+    inner: Arc<InnerContext>,
 }
 
 impl Context {
-    pub fn init() -> Result<Context, AudioError> {
+    pub fn new() -> Result<Context, AudioError> {
         unsafe {
             let context = init();
             if context.result {
-                Ok(Context { context })
+                Ok(Context {
+                    inner: Arc::new(InnerContext {
+                        context 
+                    })
+                })
             } else {
                 Err(AudioError::ContextError)
             }
@@ -159,24 +165,29 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
+    }
+}
+
+impl Drop for InnerContext {
+    fn drop(&mut self) {
         unsafe {
             uninit(&self.context);
         }
     }
 }
 
-pub struct AudioHandle<'a> {
+pub struct AudioHandle {
     id: usize,
     path: PathBuf,
-    context: &'a Context,
+    context: Context,
 }
 
-impl<'a> AudioHandle<'a> {
+impl AudioHandle {
     pub fn load<P: AsRef<Path>>(
         path: P,
-        context: &'a Context,
+        context: Context,
         device: &Device,
-    ) -> Result<AudioHandle<'a>, AudioError> {
+    ) -> Result<AudioHandle, AudioError> {
         if metadata(path.as_ref()).is_err() {
             return Err(AudioError::FileError);
         };
@@ -185,7 +196,7 @@ impl<'a> AudioHandle<'a> {
             let id = get_id();
             let result = load(
                 id,
-                &context.context,
+                &context.inner.context,
                 CString::new(path.as_ref().as_os_str().to_str().unwrap())
                     .unwrap()
                     .as_ptr(),
@@ -207,19 +218,19 @@ impl<'a> AudioHandle<'a> {
 
     pub fn play(&self) {
         unsafe {
-            play(self.id, &self.context.context);
+            play(self.id, &self.context.inner.context);
         }
     }
 
     pub fn stop(&self) {
         unsafe {
-            stop(self.id, &self.context.context);
+            stop(self.id, &self.context.inner.context);
         }
     }
 
     pub fn reset(&self) {
         unsafe {
-            reset(self.id, &self.context.context);
+            reset(self.id, &self.context.inner.context);
         }
     }
 
@@ -237,31 +248,32 @@ impl<'a> AudioHandle<'a> {
 
     pub fn set_volume(&self, volume: f32) {
         unsafe {
-            setVolume(self.id, &self.context.context, volume);
+            setVolume(self.id, &self.context.inner.context, volume);
         }
     }
 
     pub fn volume(&self) -> f32 {
-        unsafe { getVolume(self.id, &self.context.context) }
+        unsafe { getVolume(self.id, &self.context.inner.context) }
     }
 
     pub fn is_playing(&self) -> bool {
-        unsafe { isPlaying(self.id, &self.context.context) }
+        unsafe { isPlaying(self.id, &self.context.inner.context) }
     }
 
     pub fn is_paused(&self) -> bool {
-        unsafe { !isPlaying(self.id, &self.context.context) }
+        unsafe { !isPlaying(self.id, &self.context.inner.context) }
     }
 
     pub fn duration(&self) -> Duration {
-        unsafe { Duration::from_millis(getDuration(self.id, &self.context.context)) }
+        unsafe { Duration::from_millis(getDuration(self.id, &self.context.inner.context)) }
     }
 }
 
-impl<'a> Drop for AudioHandle<'a> {
+impl Drop for AudioHandle {
     fn drop(&mut self) {
+        println!("dropped: {}", self.id);
         unsafe {
-            remove(self.id, &self.context.context);
+            removeSound(self.id, &self.context.inner.context);
         }
     }
 }
@@ -272,11 +284,11 @@ fn main() {
 
     let mut clips: Vec<AudioHandle> = Vec::new();
 
-    for _ in 0..100 {
+    for _ in 0..1 {
         let clip = AudioHandle::load(
             "Genji_-_Mada_mada!.ogg",
             &context,
-            default_output_device(&context),
+            &default_output_device(&context),
         )
         .unwrap();
         clips.push(clip);
@@ -290,7 +302,7 @@ fn main() {
 
     println!("{}", clips[0].duration().as_millis());
 
-    for i in 0..100 {
+    for i in 0..1 {
         clips[i].play();
     }
 

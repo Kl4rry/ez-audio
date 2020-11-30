@@ -19,7 +19,6 @@ extern "C" void uninit(AudioContext* context){
 	}
 	delete context->soundClips;
 	ma_context_uninit(context->context);
-	delete context;
 	delete context->mtx;
 }
 
@@ -87,10 +86,11 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 }
 
 extern "C" void removeSound(size_t id, AudioContext* context){
+	std::cout << "remove" << std::endl;
+	std::lock_guard<std::mutex> lock(*context->mtx);
 	ma_device_uninit(&context->soundClips->at(id)->device);
 	ma_decoder_uninit(&context->soundClips->at(id)->decoder);
 	delete context->soundClips->at(id);
-	std::lock_guard<std::mutex> lock(*context->mtx);
 	context->soundClips->erase(id);
 }
 
@@ -103,6 +103,7 @@ extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, s
 		std::cout << "Failed to retrieve device information" << std::endl;
 		return 0;
 	}
+	
 	ma_uint32 i{0};
 	for (; i < playbackDeviceCount && i < capacity; ++i) {
 		devices[i] = AudioDevice{
