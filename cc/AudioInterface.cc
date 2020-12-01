@@ -86,7 +86,6 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 }
 
 extern "C" void removeSound(size_t id, AudioContext* context){
-	std::cout << "remove" << std::endl;
 	std::lock_guard<std::mutex> lock(*context->mtx);
 	ma_device_uninit(&context->soundClips->at(id)->device);
 	ma_decoder_uninit(&context->soundClips->at(id)->decoder);

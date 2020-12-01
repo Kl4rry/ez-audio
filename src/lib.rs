@@ -271,7 +271,6 @@ impl AudioHandle {
 
 impl Drop for AudioHandle {
     fn drop(&mut self) {
-        println!("dropped: {}", self.id);
         unsafe {
             removeSound(self.id, &self.context.inner.context);
         }
