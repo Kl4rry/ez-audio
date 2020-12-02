@@ -40,7 +40,6 @@ extern "C" void play(size_t id, AudioContext* context){
 
 extern "C" void reset(size_t id, AudioContext* context){
 	ma_device_stop(&context->soundClips->at(id)->device);
-	context->soundClips->at(id)->device.masterVolumeFactor = 0;
 	ma_decoder_seek_to_pcm_frame(&context->soundClips->at(id)->decoder, 0);
 }
 
