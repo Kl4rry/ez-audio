@@ -87,14 +87,16 @@ impl fmt::Display for AudioError {
     }
 }
 
-pub fn default_output_device(context: &Context) -> Device {
+pub fn default_output_device(context: Context) -> Device {
     Device {
         device: unsafe { getDefaultAudioDevice(&context.inner.context) },
+        _context: context,
     }
 }
 
 pub struct Device {
     device: AudioDevice,
+    _context: Context,
 }
 
 impl<'a> Device {
@@ -107,7 +109,7 @@ impl<'a> Device {
     }
 }
 
-pub fn output_devices(context: &Context) -> Devices {
+pub fn output_devices(context: Context) -> Devices {
     unsafe {
         let capacity = getAudioDeviceCount(&context.inner.context);
         let mut devices: Vec<AudioDevice> = Vec::with_capacity(capacity);
@@ -117,12 +119,13 @@ pub fn output_devices(context: &Context) -> Devices {
 
         let devices = Vec::from_raw_parts(ptr, len, capacity);
 
-        Devices { devices }
+        Devices { devices, context }
     }
 }
 
 pub struct Devices {
     devices: Vec<AudioDevice>,
+    context: Context,
 }
 
 impl<'a> Iterator for Devices {
@@ -130,7 +133,10 @@ impl<'a> Iterator for Devices {
     fn next(&mut self) -> Option<Self::Item> {
         let option = self.devices.pop();
         if let Some(device) = option {
-            Some(Device { device })
+            Some(Device {
+                device,
+                _context: self.context.clone(),
+            })
         } else {
             None
         }
@@ -138,7 +144,7 @@ impl<'a> Iterator for Devices {
 }
 
 struct InnerContext {
-    context: AudioContext
+    context: AudioContext,
 }
 
 #[derive(Clone)]
@@ -152,9 +158,7 @@ impl Context {
             let context = init();
             if context.result {
                 Ok(Context {
-                    inner: Arc::new(InnerContext {
-                        context 
-                    })
+                    inner: Arc::new(InnerContext { context }),
                 })
             } else {
                 Err(AudioError::ContextError)
@@ -164,8 +168,7 @@ impl Context {
 }
 
 impl Drop for Context {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }
 
 impl Drop for InnerContext {
