@@ -33,7 +33,7 @@ extern "C" float getVolume(size_t id, AudioContext* context){
 extern "C" void play(size_t id, AudioContext* context){
 	if(!ma_device_is_started(&context->soundClips->at(id)->device)){
 		if(ma_device_start(&context->soundClips->at(id)->device) != MA_SUCCESS){
-			std::cout << "Failed to start playback: " << std::endl;
+			std::cout << "Failed to start playback" << std::endl;
 		}
 	}
 }
@@ -122,15 +122,10 @@ extern "C" size_t getAudioDeviceCount(AudioContext* context){
 }
 
 extern "C" void setAudioDevice(size_t id, AudioContext* context, AudioDevice* device){
-	//std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
-	ma_device_info* playbackDeviceInfos;
-	ma_uint32 playbackDeviceCount;
-	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
-		std::cout << "Failed to retrieve device information" << std::endl;
-	}
-	context->soundClips->at(id)->audioDevice = device;
-		
+	std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
 	ma_device_uninit(&context->soundClips->at(id)->device);
+	context->soundClips->at(id)->audioDevice = device;
+	context->soundClips->at(id)->deviceConfig.playback.pDeviceID = &device->id;
 	ma_device_init(context->context, &context->soundClips->at(id)->deviceConfig, &context->soundClips->at(id)->device);
 }
 

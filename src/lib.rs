@@ -58,6 +58,7 @@ extern "C" {
         capacity: usize,
     ) -> usize;
     fn getAudioDeviceCount(context: &AudioContext) -> usize;
+    fn setAudioDevice(id: usize, context: *const AudioContext, device: *const AudioDevice);
 }
 
 #[derive(Debug, Clone)]
@@ -98,6 +99,8 @@ pub struct Device {
     device: AudioDevice,
     _context: Context,
 }
+
+unsafe impl Send for Device {}
 
 impl<'a> Device {
     pub fn name(&self) -> &'a str {
@@ -270,6 +273,10 @@ impl AudioHandle {
     pub fn duration(&self) -> Duration {
         unsafe { Duration::from_millis(getDuration(self.id, &self.context.inner.context)) }
     }
+
+    pub fn set_output_device(&self, device: &Device) {
+        unsafe { setAudioDevice(self.id, &self.context.inner.context, &device.device) } 
+    }
 }
 
 impl Drop for AudioHandle {
@@ -282,21 +289,20 @@ impl Drop for AudioHandle {
 
 /*
 fn main() {
-    let context = Context::init().unwrap();
+    let context = Context::new().unwrap();
 
     let mut clips: Vec<AudioHandle> = Vec::new();
+    let devices: Vec<Device> = output_devices(context.clone()).collect();
 
     for _ in 0..1 {
         let clip = AudioHandle::load(
             "Genji_-_Mada_mada!.ogg",
-            &context,
-            &default_output_device(&context),
+            context.clone(),
+            &devices[1]
         )
         .unwrap();
         clips.push(clip);
     }
-
-    let devices = output_devices(&context);
 
     for device in devices {
         println!("{}", device.name());
