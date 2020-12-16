@@ -6,7 +6,7 @@
 #include <chrono>
 #include <mutex>
 
-extern "C" AudioContext init();
+extern "C" AudioContext init(void (*end_callback)(void*));
 
 extern "C" void uninit(AudioContext* context);
 
@@ -21,6 +21,8 @@ extern "C" void reset(size_t id, AudioContext* context);
 extern "C" void stop(size_t id, AudioContext* context);
 
 extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDevice* device);
+
+extern "C" void setOuter(size_t id, AudioContext* context, void* outer);
 
 extern "C" void removeSound(size_t id, AudioContext* context);
 

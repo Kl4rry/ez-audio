@@ -1,6 +1,7 @@
 #include "AudioInterface.h"
 
-extern "C" AudioContext init(){
+extern "C" AudioContext init(void (*end_callback)(void*)){
+	std::lock_guard<std::mutex> lock(global);
 	ma_context* context = new ma_context();
 	if(ma_context_init(NULL, 0, NULL, context) != MA_SUCCESS){
 		std::cout << "Failed to initialize context" << std::endl;
@@ -8,15 +9,13 @@ extern "C" AudioContext init(){
 		return AudioContext{nullptr, nullptr, false, nullptr};
 	}
 
+	endCallback = end_callback;
+
 	return AudioContext{context, new std::unordered_map<size_t, SoundClip*>, true, new std::mutex()};
 }
 
 extern "C" void uninit(AudioContext* context){
-	for(std::pair<size_t, SoundClip*> clip : *(context->soundClips)){
-		ma_decoder_uninit(&clip.second->decoder);
-		ma_device_uninit(&clip.second->device);
-		delete clip.second;
-	}
+	std::lock_guard<std::mutex> lock(global);
 	delete context->soundClips;
 	ma_context_uninit(context->context);
 	delete context->mtx;
@@ -39,6 +38,7 @@ extern "C" void play(size_t id, AudioContext* context){
 }
 
 extern "C" void reset(size_t id, AudioContext* context){
+	std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
 	ma_device_stop(&context->soundClips->at(id)->device);
 	ma_decoder_seek_to_pcm_frame(&context->soundClips->at(id)->decoder, 0);
 }
@@ -51,6 +51,7 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 	SoundClip* soundClip = new SoundClip;
 	soundClip->id = id;
 	soundClip->audioDevice = device;
+	soundClip->outer = nullptr;
 
 	//creating and configuring decoder
 	if(ma_decoder_init_file(path, NULL, &soundClip->decoder) != MA_SUCCESS){
@@ -84,11 +85,20 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 	return 0;
 }
 
-extern "C" void removeSound(size_t id, AudioContext* context){
+extern "C" void setOuter(size_t id, AudioContext* context, void* outer){
 	std::lock_guard<std::mutex> lock(*context->mtx);
-	ma_device_uninit(&context->soundClips->at(id)->device);
+	context->soundClips->at(id)->outer = outer;
+}
+
+extern "C" void removeSound(size_t id, AudioContext* context){
+	std::lock_guard<std::mutex> ctx_lock(*context->mtx);
+	std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
+
+	//std::cout << "removed: " << id << " size: " << context->soundClips->size() << std::endl;
 	ma_decoder_uninit(&context->soundClips->at(id)->decoder);
-	delete context->soundClips->at(id);
+	ma_device_uninit(&context->soundClips->at(id)->device);
+	
+	delete context->soundClips->at(id)->device.pUserData;
 	context->soundClips->erase(id);
 }
 

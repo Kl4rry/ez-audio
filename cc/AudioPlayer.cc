@@ -31,7 +31,10 @@ void resetDevice(ma_device* device, SoundClip* clip, float const& oldVolume){
 		ma_device_stop(device);
 		ma_decoder_seek_to_pcm_frame(&clip->decoder, 0);
 		device->masterVolumeFactor = oldVolume;
-		//call end callback
+		endCallback(clip->outer);
 	}};
 	t.detach();
 }
+
+void (*endCallback)(void*) = nullptr;
+std::mutex global{};

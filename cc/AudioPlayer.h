@@ -6,6 +6,7 @@
 #include <atomic>
 #include <mutex>
 #include <array>
+#include <iostream>
 
 struct AudioContext;
 
@@ -27,6 +28,7 @@ struct SoundClip{
 	std::mutex mtx;
 	AudioDevice* audioDevice;
 	AudioContext* context;
+	void* outer;
 };
 
 struct AudioContext{
@@ -36,5 +38,7 @@ struct AudioContext{
 	std::mutex* mtx;
 };
 
+extern std::mutex global;
+extern void (*endCallback)(void*);
 void data_callback(ma_device* device, void* output, const void* input, ma_uint32 frameCount);
 void resetDevice(ma_device* device, SoundClip* clip, float const& oldVolume);

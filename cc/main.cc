@@ -4,7 +4,7 @@
 using namespace std;
 
 int main(){
-    auto context = init();
+    /*auto context = init();
     if(context.result){
         cout <<  "hello" << endl;
         AudioDevice* device = new AudioDevice(getDefaultAudioDevice(&context));
@@ -18,7 +18,7 @@ int main(){
     
 
     getchar();
-    uninit(&context);
+    uninit(&context);*/
 }
 
 
