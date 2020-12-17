@@ -18,6 +18,7 @@ void data_callback(ma_device* device, void* output, const void*, ma_uint32 frame
 	}
 	ma_uint64 framesRead = ma_decoder_read_pcm_frames(&clip->decoder, output, framesToRead);
 	if(framesRead < framesToRead){
+		std::lock_guard<std::mutex> lock(clip->mtx);
 		float oldVolume = device->masterVolumeFactor;
 		device->masterVolumeFactor = 0;
 		ma_decoder_seek_to_pcm_frame(&clip->decoder, 0);

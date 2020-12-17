@@ -93,8 +93,6 @@ extern "C" void setOuter(size_t id, AudioContext* context, void* outer){
 extern "C" void removeSound(size_t id, AudioContext* context){
 	std::lock_guard<std::mutex> ctx_lock(*context->mtx);
 	std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
-
-	//std::cout << "removed: " << id << " size: " << context->soundClips->size() << std::endl;
 	ma_decoder_uninit(&context->soundClips->at(id)->decoder);
 	ma_device_uninit(&context->soundClips->at(id)->device);
 	

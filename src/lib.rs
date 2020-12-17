@@ -1,14 +1,21 @@
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
+#![feature(get_mut_unchecked)]
+
 use std::ffi::{CStr, CString, OsStr};
 use std::fs::metadata;
 use std::iter::Iterator;
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 use std::time::Duration;
 
 use std::error::Error;
 use std::fmt;
+
+mod void;
 
 static mut ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -24,15 +31,15 @@ struct AudioDevice {
 
 #[repr(C)]
 struct AudioContext {
-    context: usize,
+    context: usize, //pointer not real
     sound_clips: usize,
     result: bool,
-    mtx: usize,//pointer not real
+    mtx: usize, //pointer not real
 }
 
 #[allow(improper_ctypes)]
 extern "C" {
-    fn init(end_callback: unsafe extern "C" fn(*const InnerHandle)) -> AudioContext;
+    fn init(end_callback: unsafe extern "C" fn(*mut InnerHandle<()>)) -> AudioContext;
     fn uninit(context: *const AudioContext);
 
     fn load(
@@ -41,7 +48,7 @@ extern "C" {
         path: *const c_char,
         device: *const AudioDevice,
     ) -> i32;
-    fn setOuter(id: usize, context: *const AudioContext, outer: *const InnerHandle);
+    fn setOuter(id: usize, context: *const AudioContext, outer: *const InnerHandle<()>);
     fn removeSound(id: usize, context: *const AudioContext);
 
     fn play(id: usize, context: *const AudioContext);
@@ -150,7 +157,7 @@ impl<'a> Iterator for Devices {
 }
 
 #[no_mangle]
-unsafe extern "C" fn end_callback(inner_handle: *const InnerHandle) {
+unsafe extern "C" fn end_callback(inner_handle: *mut InnerHandle<()>) {
     (*inner_handle).on_end();
 }
 
@@ -186,29 +193,53 @@ impl Drop for InnerContext {
     }
 }
 
-struct InnerHandle {
-    id: usize,
-    path: PathBuf,
+pub struct AudioLoader<'a, T, I, P> {
+    path: P,
     context: Context,
+    device: Option<&'a Device>,
+    volume: f32,
+    on_end: Option<I>,
+    user_data: Option<T>,
 }
 
-impl InnerHandle {
-    fn on_end(&self) {
-        println!("yeet");
+impl<'a, P> AudioLoader<'a, (), void::Void, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn new(path: P, context: Context) -> AudioLoader<'a, (), void::Void, P> {
+        AudioLoader {
+            path: path,
+            context: context.clone(),
+            device: None,
+            volume: 1f32,
+            on_end: None,
+            user_data: Some(()),
+        }
     }
 }
 
-pub struct AudioHandle {
-    inner: Arc<InnerHandle>,
-}
+impl<'a, T, I, P> AudioLoader<'a, T, I, P>
+where
+    P: AsRef<Path>,
+    I: 'static + FnMut(&mut T),
+{
+    pub fn context(mut self, context: Context) -> Self {
+        self.context = context;
+        self
+    }
 
-impl AudioHandle {
-    pub fn load<P: AsRef<Path>>(
-        path: P,
-        context: Context,
-        device: &Device,
-    ) -> Result<AudioHandle, AudioError> {
-        if metadata(path.as_ref()).is_err() {
+    pub fn device(mut self, device: &'a Device) -> Self {
+        self.device = Some(device);
+        self
+    }
+
+    pub fn volume(mut self, volume: f32) -> Self {
+        self.volume = volume;
+        self
+    }
+
+    pub fn load(self) -> Result<AudioHandle<T>, AudioError> {
+        if metadata(self.path.as_ref()).is_err() {
             return Err(AudioError::FileError);
         };
 
@@ -216,20 +247,38 @@ impl AudioHandle {
             let id = get_id();
             let result = load(
                 id,
-                &context.inner.context,
-                CString::new(path.as_ref().as_os_str().to_str().unwrap())
+                &self.context.inner.context,
+                #[allow(temporary_cstring_as_ptr)]
+                CString::new(self.path.as_ref().as_os_str().to_str().unwrap())
                     .unwrap()
                     .as_ptr(),
-                &device.device,
+                &self
+                    .device
+                    .unwrap_or(&default_output_device(self.context.clone()))
+                    .device,
             );
 
             let res = match result {
                 0 => Ok(AudioHandle {
                     inner: Arc::new(InnerHandle {
                         id: id,
-                        path: path.as_ref().to_path_buf(),
-                        context: context.clone(),
-                    })
+                        path: self.path.as_ref().to_path_buf(),
+                        context: self.context.clone(),
+                        user_data: {
+                            if let Some(data) = self.user_data {
+                                Some(Mutex::new(Rc::new(data)))
+                            } else {
+                                None
+                            }
+                        },
+                        on_end: {
+                            if let Some(on_end) = self.on_end {
+                                Some(Box::new(on_end))
+                            } else {
+                                None
+                            }
+                        },
+                    }),
                 }),
                 -1 => Err(AudioError::DecoderError),
                 -2 => Err(AudioError::DeviceError),
@@ -237,12 +286,86 @@ impl AudioHandle {
             };
 
             if res.is_ok() {
-                setOuter(id, &context.inner.context, Arc::as_ptr(&res.as_ref().unwrap().inner));
+                setOuter(
+                    id,
+                    &self.context.inner.context,
+                    Arc::as_ptr(&res.as_ref().unwrap().inner) as *const InnerHandle<()>,
+                );
             }
             res
         }
     }
+}
 
+impl<'a, T, I, P0> AudioLoader<'a, T, I, P0> {
+    pub fn path<P1: AsRef<Path>>(self, path: P1) -> AudioLoader<'a, T, I, P1> {
+        AudioLoader {
+            path: path,
+            context: self.context,
+            device: self.device,
+            volume: self.volume,
+            on_end: self.on_end,
+            user_data: self.user_data,
+        }
+    }
+}
+
+impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
+    pub fn user_data<T1>(self, user_data: T1) -> AudioLoader<'a, T1, I, P> {
+        AudioLoader {
+            path: self.path,
+            context: self.context,
+            device: self.device,
+            volume: self.volume,
+            on_end: self.on_end,
+            user_data: Some(user_data),
+        }
+    }
+}
+
+impl<'a, T, F0: Fn(T), P> AudioLoader<'a, T, F0, P> {
+    pub fn on_end<F1: FnMut(&mut T)>(self, on_end: F1) -> AudioLoader<'a, T, F1, P> {
+        AudioLoader {
+            path: self.path,
+            context: self.context,
+            device: self.device,
+            volume: self.volume,
+            on_end: Some(on_end),
+            user_data: self.user_data,
+        }
+    }
+}
+
+struct InnerHandle<T> {
+    id: usize,
+    path: PathBuf,
+    context: Context,
+    user_data: Option<Mutex<Rc<T>>>,
+    on_end: Option<Box<dyn FnMut(&mut T)>>,
+}
+
+impl<T> InnerHandle<T> {
+    fn on_end(&mut self) {
+        if let Some(closure) = &mut self.on_end {
+            let mut refrence = self
+                .user_data
+                .as_mut()
+                .unwrap()
+                .lock()
+                .unwrap();
+            unsafe {
+                let thing = Rc::get_mut_unchecked(&mut refrence);
+                (closure)(thing);
+            }
+        }
+    }
+}
+
+pub struct AudioHandle<T> {
+    inner: Arc<InnerHandle<T>>,
+}
+
+impl<T> AudioHandle<T> {
     pub fn play(&self) {
         unsafe {
             play(self.inner.id, &self.inner.context.inner.context);
@@ -266,7 +389,8 @@ impl AudioHandle {
     }
 
     pub fn name(&self) -> &str {
-        self.inner.path
+        self.inner
+            .path
             .file_name()
             .unwrap_or(OsStr::new("Undefined"))
             .to_str()
@@ -292,15 +416,26 @@ impl AudioHandle {
     }
 
     pub fn duration(&self) -> Duration {
-        unsafe { Duration::from_millis(getDuration(self.inner.id, &self.inner.context.inner.context)) }
+        unsafe {
+            Duration::from_millis(getDuration(
+                self.inner.id,
+                &self.inner.context.inner.context,
+            ))
+        }
     }
 
     pub fn set_output_device(&self, device: &Device) {
-        unsafe { setAudioDevice(self.inner.id, &self.inner.context.inner.context, &device.device) }
+        unsafe {
+            setAudioDevice(
+                self.inner.id,
+                &self.inner.context.inner.context,
+                &device.device,
+            )
+        }
     }
 }
 
-impl Drop for AudioHandle {
+impl<T> Drop for AudioHandle<T> {
     fn drop(&mut self) {
         unsafe {
             removeSound(self.inner.id, &self.inner.context.inner.context);
@@ -312,29 +447,11 @@ impl Drop for AudioHandle {
 fn main() {
     let context = Context::new().unwrap();
 
-    let mut clips: Vec<AudioHandle> = Vec::new();
-    let devices: Vec<Device> = output_devices(context.clone()).collect();
+    let clip = AudioLoader::new("Genji_-_Mada_mada!.ogg", context.clone()).on_end(|data|{
+        println!("{:?}", data);
+    }).load().unwrap();
 
-    for _ in 0..1 {
-        let clip = AudioHandle::load(
-            "Genji_-_Mada_mada!.ogg",
-            context.clone(),
-            &devices[1]
-        )
-        .unwrap();
-        clips.push(clip);
-    }
-
-    for device in devices {
-        println!("{}", device.name());
-    }
-
-    println!("{}", clips[0].duration().as_millis());
-
-    for i in 0..1 {
-        clips[i].play();
-    }
+    clip.play();
 
     loop {}
-}
-*/
+}*/
