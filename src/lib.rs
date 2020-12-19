@@ -9,7 +9,6 @@ use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::rc::Rc;
 use std::time::Duration;
 
 use std::error::Error;
@@ -221,7 +220,7 @@ where
 impl<'a, T, I, P> AudioLoader<'a, T, I, P>
 where
     P: AsRef<Path>,
-    I: 'static + FnMut(&mut T),
+    I: 'static + FnMut(&mut T) + Send,
 {
     pub fn context(mut self, context: Context) -> Self {
         self.context = context;
@@ -266,14 +265,14 @@ where
                         context: self.context.clone(),
                         user_data: {
                             if let Some(data) = self.user_data {
-                                Some(Mutex::new(Rc::new(data)))
+                                Some(Mutex::new(Arc::new(data)))
                             } else {
                                 None
                             }
                         },
                         on_end: {
                             if let Some(on_end) = self.on_end {
-                                Some(Box::new(on_end))
+                                Some(Mutex::new(Box::new(on_end)))
                             } else {
                                 None
                             }
@@ -324,7 +323,7 @@ impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
 }
 
 impl<'a, T, F0: Fn(T), P> AudioLoader<'a, T, F0, P> {
-    pub fn on_end<F1: FnMut(&mut T)>(self, on_end: F1) -> AudioLoader<'a, T, F1, P> {
+    pub fn on_end<F1: FnMut(&mut T) + Send>(self, on_end: F1) -> AudioLoader<'a, T, F1, P> {
         AudioLoader {
             path: self.path,
             context: self.context,
@@ -340,11 +339,11 @@ struct InnerHandle<T> {
     id: usize,
     path: PathBuf,
     context: Context,
-    user_data: Option<Mutex<Rc<T>>>,
-    on_end: Option<Box<dyn FnMut(&mut T)>>,
+    user_data: Option<Mutex<Arc<T>>>,
+    on_end: Option<Mutex<Box<dyn FnMut(&mut T) + Send>>>,
 }
 
-impl<T> InnerHandle<T> {
+impl<T> InnerHandle<T>{
     fn on_end(&mut self) {
         if let Some(closure) = &mut self.on_end {
             let mut refrence = self
@@ -354,8 +353,8 @@ impl<T> InnerHandle<T> {
                 .lock()
                 .unwrap();
             unsafe {
-                let thing = Rc::get_mut_unchecked(&mut refrence);
-                (closure)(thing);
+                let thing = Arc::get_mut_unchecked(&mut refrence);
+                (closure.lock().unwrap())(thing);
             }
         }
     }

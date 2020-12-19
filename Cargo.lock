@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ez-audio"
+name = "ez_audio"
 version = "0.1.0"
 dependencies = [
  "cc",
