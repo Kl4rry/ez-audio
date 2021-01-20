@@ -353,8 +353,8 @@ impl<T> InnerHandle<T>{
                 .lock()
                 .unwrap();
             unsafe {
-                let thing = Arc::get_mut_unchecked(&mut refrence);
-                (closure.lock().unwrap())(thing);
+                let user_data = Arc::get_mut_unchecked(&mut refrence);
+                (closure.lock().unwrap())(user_data);
             }
         }
     }
