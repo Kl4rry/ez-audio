@@ -8,7 +8,7 @@ use std::iter::Iterator;
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use std::error::Error;
@@ -198,7 +198,7 @@ pub struct AudioLoader<'a, T, I, P> {
     device: Option<&'a Device>,
     volume: f32,
     on_end: Option<I>,
-    user_data: Option<T>,
+    user_data: T,
 }
 
 impl<'a, P> AudioLoader<'a, (), void::Void, P>
@@ -212,7 +212,7 @@ where
             device: None,
             volume: 1f32,
             on_end: None,
-            user_data: Some(()),
+            user_data: (),
         }
     }
 }
@@ -263,13 +263,7 @@ where
                         id: id,
                         path: self.path.as_ref().to_path_buf(),
                         context: self.context.clone(),
-                        user_data: {
-                            if let Some(data) = self.user_data {
-                                Some(Mutex::new(Arc::new(data)))
-                            } else {
-                                None
-                            }
-                        },
+                        user_data: RwLock::new(Arc::new(self.user_data)),
                         on_end: {
                             if let Some(on_end) = self.on_end {
                                 Some(Mutex::new(Box::new(on_end)))
@@ -317,7 +311,7 @@ impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
             device: self.device,
             volume: self.volume,
             on_end: self.on_end,
-            user_data: Some(user_data),
+            user_data: user_data,
         }
     }
 }
@@ -339,7 +333,7 @@ struct InnerHandle<T> {
     id: usize,
     path: PathBuf,
     context: Context,
-    user_data: Option<Mutex<Arc<T>>>,
+    user_data: RwLock<Arc<T>>,
     on_end: Option<Mutex<Box<dyn FnMut(&mut T) + Send>>>,
 }
 
@@ -348,9 +342,7 @@ impl<T> InnerHandle<T>{
         if let Some(closure) = &mut self.on_end {
             let mut refrence = self
                 .user_data
-                .as_mut()
-                .unwrap()
-                .lock()
+                .write()
                 .unwrap();
             unsafe {
                 let user_data = Arc::get_mut_unchecked(&mut refrence);
@@ -431,6 +423,22 @@ impl<T> AudioHandle<T> {
                 &device.device,
             )
         }
+    }
+
+    pub fn set_user_data(&mut self, data: T) {
+        unsafe {
+            *Arc::get_mut_unchecked(&mut*self.inner.user_data.write().unwrap()) = data;
+        }
+    }
+
+    pub fn user_data(&self) -> &T {
+        unsafe {
+            Arc::as_ptr(&*self.inner.user_data.read().unwrap()).as_ref().unwrap()
+        }
+    }
+
+    pub fn user_data_mut(&mut self) -> &mut T {
+        unimplemented!();
     }
 }
 
