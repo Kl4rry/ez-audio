@@ -30,7 +30,7 @@ struct AudioDevice {
 
 #[repr(C)]
 struct AudioContext {
-    context: usize,     //pointer not real usize
+    context: usize, //pointer not real usize
     sound_clips: usize, //pointer not real usize
     result: bool,
     mtx: usize, //pointer not real usize
@@ -360,13 +360,13 @@ impl<T> AudioHandle<T> {
         }
     }
 
-    pub fn stop(&self) {
+    pub fn stop(&mut self) {
         unsafe {
             stop(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
-    pub fn reset(&self) {
+    pub fn reset(&mut self) {
         unsafe {
             reset(self.inner.id, &self.inner.context.inner.context);
         }
@@ -385,7 +385,7 @@ impl<T> AudioHandle<T> {
             .unwrap_or("Undefined")
     }
 
-    pub fn set_volume(&self, volume: f32) {
+    pub fn set_volume(&mut self, volume: f32) {
         unsafe {
             setVolume(self.inner.id, &self.inner.context.inner.context, volume);
         }
@@ -412,7 +412,7 @@ impl<T> AudioHandle<T> {
         }
     }
 
-    pub fn set_output_device(&self, device: &Device) {
+    pub fn set_output_device(&mut self, device: &Device) {
         unsafe {
             setAudioDevice(
                 self.inner.id,
