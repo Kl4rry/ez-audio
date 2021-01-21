@@ -337,13 +337,10 @@ struct InnerHandle<T> {
     on_end: Option<Mutex<Box<dyn FnMut(&mut T) + Send>>>,
 }
 
-impl<T> InnerHandle<T>{
+impl<T> InnerHandle<T> {
     fn on_end(&mut self) {
         if let Some(closure) = &mut self.on_end {
-            let mut refrence = self
-                .user_data
-                .write()
-                .unwrap();
+            let mut refrence = self.user_data.write().unwrap();
             unsafe {
                 let user_data = Arc::get_mut_unchecked(&mut refrence);
                 (closure.lock().unwrap())(user_data);
@@ -357,7 +354,7 @@ pub struct AudioHandle<T> {
 }
 
 impl<T> AudioHandle<T> {
-    pub fn play(&self) {
+    pub fn play(&mut self) {
         unsafe {
             play(self.inner.id, &self.inner.context.inner.context);
         }
@@ -427,18 +424,16 @@ impl<T> AudioHandle<T> {
 
     pub fn set_user_data(&mut self, data: T) {
         unsafe {
-            *Arc::get_mut_unchecked(&mut*self.inner.user_data.write().unwrap()) = data;
+            *Arc::get_mut_unchecked(&mut *self.inner.user_data.write().unwrap()) = data;
         }
     }
 
-    pub fn user_data(&self) -> &T {
+    pub fn modify_user_data<I: FnMut(&mut T)>(&self, mut closure: I) {
+        let mut refrence = self.inner.user_data.write().unwrap();
         unsafe {
-            Arc::as_ptr(&*self.inner.user_data.read().unwrap()).as_ref().unwrap()
+            let user_data = Arc::get_mut_unchecked(&mut refrence);
+            closure(user_data);
         }
-    }
-
-    pub fn user_data_mut(&mut self) -> &mut T {
-        unimplemented!();
     }
 }
 
@@ -450,15 +445,18 @@ impl<T> Drop for AudioHandle<T> {
     }
 }
 
-/*
 fn main() {
     let context = Context::new().unwrap();
 
-    let clip = AudioLoader::new("Genji_-_Mada_mada!.ogg", context.clone()).on_end(|data|{
-        println!("{:?}", data);
-    }).load().unwrap();
+    let mut clip = AudioLoader::new("Genji_-_Mada_mada!.ogg", context.clone())
+        .user_data(10)
+        .on_end(|data| {
+            println!("{:?}", data);
+        })
+        .load()
+        .unwrap();
 
     clip.play();
 
     loop {}
-}*/
+}
