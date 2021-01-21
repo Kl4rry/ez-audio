@@ -11,7 +11,7 @@
 //probably separeating device and context to match api
 //this is clearly worng but it do work for now
 
-void data_callback(ma_device* device, void* output, const void*, ma_uint32 framesToRead){
+void data_callback(ma_device* device, void* output, const void*, ma_uint32 framesToRead) {
 	SoundClip* clip = (SoundClip*)device->pUserData;
 	if(&clip->decoder == NULL){
 			return;
@@ -26,7 +26,7 @@ void data_callback(ma_device* device, void* output, const void*, ma_uint32 frame
 	}
 }
 
-void resetDevice(ma_device* device, SoundClip* clip, float const& oldVolume){
+void resetDevice(ma_device* device, SoundClip* clip, float const& oldVolume) {
 	std::thread t{[device, clip, oldVolume](){
 		std::lock_guard<std::mutex> lock(clip->mtx);
 		ma_device_stop(device);

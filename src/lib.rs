@@ -30,10 +30,10 @@ struct AudioDevice {
 
 #[repr(C)]
 struct AudioContext {
-    context: usize, //pointer not real
-    sound_clips: usize,
+    context: usize,     //pointer not real usize
+    sound_clips: usize, //pointer not real usize
     result: bool,
-    mtx: usize, //pointer not real
+    mtx: usize, //pointer not real usize
 }
 
 #[allow(improper_ctypes)]
@@ -444,7 +444,7 @@ impl<T> Drop for AudioHandle<T> {
         }
     }
 }
-
+/*
 fn main() {
     let context = Context::new().unwrap();
 
@@ -459,4 +459,4 @@ fn main() {
     clip.play();
 
     loop {}
-}
+}*/

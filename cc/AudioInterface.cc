@@ -1,6 +1,6 @@
 #include "AudioInterface.h"
 
-extern "C" AudioContext init(void (*end_callback)(void*)){
+extern "C" AudioContext init(void (*end_callback)(void*)) {
 	std::lock_guard<std::mutex> lock(global);
 	ma_context* context = new ma_context();
 	if(ma_context_init(NULL, 0, NULL, context) != MA_SUCCESS){
@@ -14,47 +14,47 @@ extern "C" AudioContext init(void (*end_callback)(void*)){
 	return AudioContext{context, new std::unordered_map<size_t, SoundClip*>, true, new std::mutex()};
 }
 
-extern "C" void uninit(AudioContext* context){
+extern "C" void uninit(AudioContext* context) {
 	std::lock_guard<std::mutex> lock(global);
 	delete context->soundClips;
 	ma_context_uninit(context->context);
 	delete context->mtx;
 }
 
-extern "C" void setVolume(size_t id, AudioContext* context, float value){
+extern "C" void setVolume(size_t id, AudioContext* context, float value) {
 	context->soundClips->at(id)->device.masterVolumeFactor = value;
 }
 
-extern "C" float getVolume(size_t id, AudioContext* context){
+extern "C" float getVolume(size_t id, AudioContext* context) {
 	return context->soundClips->at(id)->device.masterVolumeFactor;
 }
 
 extern "C" void play(size_t id, AudioContext* context){
 	if(!ma_device_is_started(&context->soundClips->at(id)->device)){
-		if(ma_device_start(&context->soundClips->at(id)->device) != MA_SUCCESS){
+		if(ma_device_start(&context->soundClips->at(id)->device) != MA_SUCCESS) {
 			std::cout << "Failed to start playback" << std::endl;
 		}
 	}
 }
 
-extern "C" void reset(size_t id, AudioContext* context){
+extern "C" void reset(size_t id, AudioContext* context) {
 	std::lock_guard<std::mutex> lock(context->soundClips->at(id)->mtx);
 	ma_device_stop(&context->soundClips->at(id)->device);
 	ma_decoder_seek_to_pcm_frame(&context->soundClips->at(id)->decoder, 0);
 }
 
-extern "C" void stop(size_t id, AudioContext* context){
+extern "C" void stop(size_t id, AudioContext* context) {
 	ma_device_stop(&context->soundClips->at(id)->device);
 }
 
-extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDevice* device){
+extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDevice* device) {
 	SoundClip* soundClip = new SoundClip;
 	soundClip->id = id;
 	soundClip->audioDevice = device;
 	soundClip->outer = nullptr;
 
 	//creating and configuring decoder
-	if(ma_decoder_init_file(path, NULL, &soundClip->decoder) != MA_SUCCESS){
+	if(ma_decoder_init_file(path, NULL, &soundClip->decoder) != MA_SUCCESS) {
 		ma_decoder_uninit(&soundClip->decoder);
 		delete soundClip;
 		return -1;
@@ -70,7 +70,7 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 
 	soundClip->deviceConfig.playback.pDeviceID = &device->id;
 
-	if(ma_device_init(context->context, &soundClip->deviceConfig, &soundClip->device) != MA_SUCCESS){
+	if(ma_device_init(context->context, &soundClip->deviceConfig, &soundClip->device) != MA_SUCCESS) {
 		std::cout << "Failed to open playback device" << std::endl;
 		ma_decoder_uninit(&soundClip->decoder);
 		delete soundClip;
@@ -85,7 +85,7 @@ extern "C" int load(size_t id, AudioContext* context, const char* path, AudioDev
 	return 0;
 }
 
-extern "C" void setOuter(size_t id, AudioContext* context, void* outer){
+extern "C" void setOuter(size_t id, AudioContext* context, void* outer) {
 	std::lock_guard<std::mutex> lock(*context->mtx);
 	context->soundClips->at(id)->outer = outer;
 }
@@ -101,11 +101,11 @@ extern "C" void removeSound(size_t id, AudioContext* context){
 }
 
 
-extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, size_t capacity){
+extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, size_t capacity) {
 	ma_device_info* playbackDeviceInfos;
 	ma_uint32 playbackDeviceCount;
 
-	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
+	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS) {
 		std::cout << "Failed to retrieve device information" << std::endl;
 		return 0;
 	}
@@ -122,7 +122,7 @@ extern "C" size_t getAudioDevices(AudioContext* context, AudioDevice* devices, s
 
 extern "C" size_t getAudioDeviceCount(AudioContext* context){
 	ma_uint32 playbackDeviceCount;
-	if(ma_context_get_devices(context->context, NULL, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
+	if(ma_context_get_devices(context->context, NULL, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS) {
 		std::cout << "Failed to retrieve device information" << std::endl;
 		return 0;
 	}
@@ -140,7 +140,7 @@ extern "C" void setAudioDevice(size_t id, AudioContext* context, AudioDevice* de
 extern "C" AudioDevice getDefaultAudioDevice(AudioContext* context){
 	ma_device_info* playbackDeviceInfos;
 	ma_uint32 playbackDeviceCount;
-	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS){
+	if(ma_context_get_devices(context->context, &playbackDeviceInfos, &playbackDeviceCount, NULL, NULL) != MA_SUCCESS) {
 		std::cout << "Failed to retrieve device information" << std::endl;
 	}
 	for(size_t i{0}; i<playbackDeviceCount; ++i){

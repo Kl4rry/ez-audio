@@ -10,17 +10,17 @@
 
 struct AudioContext;
 
-struct AudioDevice{
+struct AudioDevice {
 	ma_device_id id;
 	const char* name;
 };
 
-struct AudioDeviceList{
+struct AudioDeviceList {
     size_t device_count;
     AudioDevice* devices;
 };
 
-struct SoundClip{
+struct SoundClip {
 	ma_device device;
 	ma_decoder decoder;
 	ma_device_config deviceConfig;
@@ -31,7 +31,7 @@ struct SoundClip{
 	void* outer;
 };
 
-struct AudioContext{
+struct AudioContext {
 	ma_context* context;
 	std::unordered_map<size_t, SoundClip*>* soundClips;
 	bool result;
