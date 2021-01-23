@@ -354,19 +354,19 @@ pub struct AudioHandle<T> {
 }
 
 impl<T> AudioHandle<T> {
-    pub fn play(&mut self) {
+    pub fn play(&self) {
         unsafe {
             play(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
-    pub fn stop(&mut self) {
+    pub fn stop(&self) {
         unsafe {
             stop(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         unsafe {
             reset(self.inner.id, &self.inner.context.inner.context);
         }
@@ -385,7 +385,7 @@ impl<T> AudioHandle<T> {
             .unwrap_or("Undefined")
     }
 
-    pub fn set_volume(&mut self, volume: f32) {
+    pub fn set_volume(&self, volume: f32) {
         unsafe {
             setVolume(self.inner.id, &self.inner.context.inner.context, volume);
         }
@@ -412,7 +412,7 @@ impl<T> AudioHandle<T> {
         }
     }
 
-    pub fn set_output_device(&mut self, device: &Device) {
+    pub fn set_output_device(&self, device: &Device) {
         unsafe {
             setAudioDevice(
                 self.inner.id,
