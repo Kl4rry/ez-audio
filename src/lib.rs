@@ -30,7 +30,7 @@ struct AudioDevice {
 
 #[repr(C)]
 struct AudioContext {
-    context: usize, //pointer not real usize
+    context: usize,     //pointer not real usize
     sound_clips: usize, //pointer not real usize
     result: bool,
     mtx: usize, //pointer not real usize
@@ -207,8 +207,8 @@ where
 {
     pub fn new(path: P, context: Context) -> AudioLoader<'a, (), void::Void, P> {
         AudioLoader {
-            path: path,
-            context: context.clone(),
+            path,
+            context,
             device: None,
             volume: 1f32,
             on_end: None,
@@ -260,7 +260,7 @@ where
             let res = match result {
                 0 => Ok(AudioHandle {
                     inner: Arc::new(InnerHandle {
-                        id: id,
+                        id,
                         path: self.path.as_ref().to_path_buf(),
                         context: self.context.clone(),
                         user_data: RwLock::new(Arc::new(self.user_data)),
@@ -293,7 +293,7 @@ where
 impl<'a, T, I, P0> AudioLoader<'a, T, I, P0> {
     pub fn path<P1: AsRef<Path>>(self, path: P1) -> AudioLoader<'a, T, I, P1> {
         AudioLoader {
-            path: path,
+            path,
             context: self.context,
             device: self.device,
             volume: self.volume,
@@ -311,7 +311,7 @@ impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
             device: self.device,
             volume: self.volume,
             on_end: self.on_end,
-            user_data: user_data,
+            user_data,
         }
     }
 }
@@ -334,6 +334,7 @@ struct InnerHandle<T> {
     path: PathBuf,
     context: Context,
     user_data: RwLock<Arc<T>>,
+    #[allow(clippy::type_complexity)]
     on_end: Option<Mutex<Box<dyn FnMut(&mut T) + Send>>>,
 }
 
@@ -343,7 +344,7 @@ impl<T> InnerHandle<T> {
             let mut refrence = self.user_data.write().unwrap();
             unsafe {
                 let user_data = Arc::get_mut_unchecked(&mut refrence);
-                (closure.lock().unwrap())(user_data);
+                (closure.get_mut().unwrap())(user_data);
             }
         }
     }
@@ -373,14 +374,14 @@ impl<T> AudioHandle<T> {
     }
 
     pub fn path(&self) -> &Path {
-        return &self.inner.path;
+        &self.inner.path
     }
 
     pub fn name(&self) -> &str {
         self.inner
             .path
             .file_name()
-            .unwrap_or(OsStr::new("Undefined"))
+            .unwrap_or_else(|| OsStr::new("Undefined"))
             .to_str()
             .unwrap_or("Undefined")
     }
