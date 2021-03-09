@@ -169,6 +169,9 @@ pub struct Context {
     inner: Arc<InnerContext>,
 }
 
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
 impl Context {
     pub fn new() -> Result<Context, AudioError> {
         unsafe {
