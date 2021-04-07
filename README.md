@@ -17,5 +17,6 @@ ez-audio is a easy to use audio playback library that uses the C library [miniau
         .unwrap();
 
     clip.play();
+    // loop forever to stop handle from being dropped
     loop {}
 ```
