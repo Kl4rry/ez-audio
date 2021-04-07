@@ -3,6 +3,9 @@ name = "ez_audio"
 version = "0.1.0"
 authors = ["Axel Kappel <axel.e.kappel@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "A easy to use audio playback library"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
