@@ -1,4 +1,4 @@
-//! ez-audio is a easy to use audio playback library that uses the C library [miniaudio](https://github.com/mackron/miniaudio) as a backend. 
+//! ez-audio is a easy to use audio playback library that uses the C library [miniaudio](https://github.com/mackron/miniaudio) as a backend.
 //! # Examples
 //! ## Minimal
 //! ```
@@ -214,7 +214,7 @@ unsafe impl Sync for Context {}
 
 impl Context {
     /// Creates new backend context
-    pub fn new() -> Result<Context, AudioError> {
+    pub fn new() -> Result<Self, AudioError> {
         unsafe {
             let context = init(end_callback);
             if context.result {
@@ -512,19 +512,3 @@ impl<T> Drop for AudioHandle<T> {
         }
     }
 }
-/*
-fn main() {
-    let context = Context::new().unwrap();
-
-    let mut clip = AudioLoader::new("Genji_-_Mada_mada!.ogg", context.clone())
-        .user_data(10)
-        .on_end(|data| {
-            println!("{:?}", data);
-        })
-        .load()
-        .unwrap();
-
-    clip.play();
-
-    loop {}
-}*/
