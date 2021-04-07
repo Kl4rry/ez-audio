@@ -1,6 +1,33 @@
+//! ez-audio is a easy to use audio playback library that uses the C library [miniaudio](https://github.com/mackron/miniaudio) as a backend. 
+//! # Examples
+//! ## Minimal
+//! ```
+//! let context = Context::new().unwrap();
+//! let mut clip = AudioLoader::new("audio.mp3", context.clone())
+//!     .load()
+//!     .unwrap();
+//! 
+//! clip.play();
+//! loop {}
+//! ```
+//! ## With on end
+//! ```
+//! let context = Context::new().unwrap();
+//! let mut clip = AudioLoader::new("audio.mp3", context.clone())
+//!     .user_data(10)
+//!     .on_end(|data| {
+//!         assert!(data == 10)
+//!     })
+//!     .load()
+//!     .unwrap();
+//! 
+//! clip.play();
+//! loop {}
+//! ```
 #![feature(fn_traits)]
 #![feature(unboxed_closures)]
 #![feature(get_mut_unchecked)]
+#![warn(missing_docs)]
 
 use std::ffi::{CStr, CString, OsStr};
 use std::fs::metadata;
@@ -69,12 +96,19 @@ extern "C" {
     fn setAudioDevice(id: usize, context: *const AudioContext, device: *const AudioDevice);
 }
 
+/// A general purpose error.
 #[derive(Debug, Clone)]
 pub enum AudioError {
+    /// Unable to find file.
     FileError,
+    /// Unable to decode file.
     DecoderError,
+    /// Error getting audio device.
     DeviceError,
+    /// Error initializing backend.
     ContextError,
+    /// Catch all error tgat should never occur.
+    /// If it occurs it is a sign of undefined behavior. 
     UnknownError,
 }
 
@@ -96,6 +130,7 @@ impl fmt::Display for AudioError {
     }
 }
 
+/// Yields default output device.
 pub fn default_output_device(context: Context) -> Device {
     Device {
         device: unsafe { getDefaultAudioDevice(&context.inner.context) },
@@ -103,6 +138,7 @@ pub fn default_output_device(context: Context) -> Device {
     }
 }
 
+/// A handle to an audio playback device.
 pub struct Device {
     device: AudioDevice,
     _context: Context,
@@ -112,6 +148,7 @@ unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
 impl<'a> Device {
+    /// Returns name of audio device.
     pub fn name(&self) -> &'a str {
         unsafe {
             CStr::from_ptr(self.device.name)
@@ -121,6 +158,7 @@ impl<'a> Device {
     }
 }
 
+/// Yields an iterator over all audio playback devices.
 pub fn output_devices(context: Context) -> Devices {
     unsafe {
         let capacity = getAudioDeviceCount(&context.inner.context);
@@ -135,6 +173,7 @@ pub fn output_devices(context: Context) -> Devices {
     }
 }
 
+/// A iterator that yields audio devices.
 pub struct Devices {
     devices: Vec<AudioDevice>,
     context: Context,
@@ -164,6 +203,7 @@ struct InnerContext {
     context: AudioContext,
 }
 
+/// A handle to a backend context.
 #[derive(Clone)]
 pub struct Context {
     inner: Arc<InnerContext>,
@@ -173,6 +213,7 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl Context {
+    /// Creates new backend context
     pub fn new() -> Result<Context, AudioError> {
         unsafe {
             let context = init(end_callback);
@@ -195,6 +236,7 @@ impl Drop for InnerContext {
     }
 }
 
+/// A builder that loads an audio file into memory and returns an audio playback handle.
 pub struct AudioLoader<'a, T, I, P> {
     path: P,
     context: Context,
@@ -208,6 +250,7 @@ impl<'a, P> AudioLoader<'a, (), void::Void, P>
 where
     P: AsRef<Path>,
 {
+    /// Creates a new default audio loader.
     pub fn new(path: P, context: Context) -> AudioLoader<'a, (), void::Void, P> {
         AudioLoader {
             path,
@@ -225,21 +268,25 @@ where
     P: AsRef<Path>,
     I: 'static + FnMut(&mut T) + Send,
 {
+    /// Set context.
     pub fn context(mut self, context: Context) -> Self {
         self.context = context;
         self
     }
 
+    /// Set playback device
     pub fn device(mut self, device: &'a Device) -> Self {
         self.device = Some(device);
         self
     }
 
+    /// Set playback volume
     pub fn volume(mut self, volume: f32) -> Self {
         self.volume = volume;
         self
     }
 
+    /// Destroys loader and returns a audio handle
     pub fn load(self) -> Result<AudioHandle<T>, AudioError> {
         if metadata(self.path.as_ref()).is_err() {
             return Err(AudioError::FileError);
@@ -294,6 +341,7 @@ where
 }
 
 impl<'a, T, I, P0> AudioLoader<'a, T, I, P0> {
+    /// Set path to file.
     pub fn path<P1: AsRef<Path>>(self, path: P1) -> AudioLoader<'a, T, I, P1> {
         AudioLoader {
             path,
@@ -307,6 +355,7 @@ impl<'a, T, I, P0> AudioLoader<'a, T, I, P0> {
 }
 
 impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
+    /// Sets custom userdata
     pub fn user_data<T1>(self, user_data: T1) -> AudioLoader<'a, T1, I, P> {
         AudioLoader {
             path: self.path,
@@ -320,6 +369,7 @@ impl<'a, T0, I, P> AudioLoader<'a, T0, I, P> {
 }
 
 impl<'a, T, F0: Fn(T), P> AudioLoader<'a, T, F0, P> {
+    /// Sets closure to be run when the audio handle reaches the end.
     pub fn on_end<F1: FnMut(&mut T) + Send>(self, on_end: F1) -> AudioLoader<'a, T, F1, P> {
         AudioLoader {
             path: self.path,
@@ -353,33 +403,39 @@ impl<T> InnerHandle<T> {
     }
 }
 
+/// A handle that can be used to control audio playback.
 pub struct AudioHandle<T> {
     inner: Arc<InnerHandle<T>>,
 }
 
 impl<T> AudioHandle<T> {
+    /// Starts playing audio.
     pub fn play(&self) {
         unsafe {
             play(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
+    /// Pauses playback.
     pub fn stop(&self) {
         unsafe {
             stop(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
+    /// Resets to start of audio clip.
     pub fn reset(&self) {
         unsafe {
             reset(self.inner.id, &self.inner.context.inner.context);
         }
     }
 
+    /// Returns the path used to create the handle.
     pub fn path(&self) -> &Path {
         &self.inner.path
     }
 
+    /// Returns name of file used to create the handle.
     pub fn name(&self) -> &str {
         self.inner
             .path
@@ -389,24 +445,29 @@ impl<T> AudioHandle<T> {
             .unwrap_or("Undefined")
     }
 
+    /// Sets volume.
     pub fn set_volume(&self, volume: f32) {
         unsafe {
             setVolume(self.inner.id, &self.inner.context.inner.context, volume);
         }
     }
 
+    /// Returns volume.
     pub fn volume(&self) -> f32 {
         unsafe { getVolume(self.inner.id, &self.inner.context.inner.context) }
     }
 
+    /// Checks if the handle is currently playing
     pub fn is_playing(&self) -> bool {
         unsafe { isPlaying(self.inner.id, &self.inner.context.inner.context) }
     }
 
+    /// Checks if the handle is currently paused
     pub fn is_paused(&self) -> bool {
         unsafe { !isPlaying(self.inner.id, &self.inner.context.inner.context) }
     }
 
+    /// Gets duration of audio handle
     pub fn duration(&self) -> Duration {
         unsafe {
             Duration::from_millis(getDuration(
@@ -416,6 +477,7 @@ impl<T> AudioHandle<T> {
         }
     }
 
+    /// Sets playback device
     pub fn set_output_device(&self, device: &Device) {
         unsafe {
             setAudioDevice(
@@ -426,12 +488,14 @@ impl<T> AudioHandle<T> {
         }
     }
 
+    /// Sets userdata.
     pub fn set_user_data(&mut self, data: T) {
         unsafe {
             *Arc::get_mut_unchecked(&mut *self.inner.user_data.write().unwrap()) = data;
         }
     }
 
+    /// Modifes userdata using closure.
     pub fn modify_user_data<I: FnMut(&mut T)>(&self, mut closure: I) {
         let mut refrence = self.inner.user_data.write().unwrap();
         unsafe {
