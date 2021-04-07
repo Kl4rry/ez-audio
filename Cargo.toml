@@ -5,7 +5,8 @@ authors = ["Axel Kappel <axel.e.kappel@gmail.com>"]
 edition = "2018"
 license = "MIT"
 description = "A easy to use audio playback library"
-
+keywords = ["audio", "multimedia"]
+categories = ["Multimedia"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
