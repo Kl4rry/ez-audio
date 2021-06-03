@@ -4,7 +4,7 @@ version = "0.1.5"
 authors = ["Axel Kappel <axel.e.kappel@gmail.com>"]
 edition = "2018"
 license = "MIT"
-description = "A easy to use audio playback library"
+description = "🔊 A easy to use audio playback library"
 keywords = ["audio", "multimedia"]
 categories = ["multimedia::audio", "multimedia"]
 
