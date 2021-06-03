@@ -3,7 +3,7 @@
 [![Docs.rs](https://docs.rs/ez_audio/badge.svg)](https://docs.rs/ez_audio)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)  
 ez-audio is a easy to use audio playback library that uses the C library [miniaudio](https://github.com/mackron/miniaudio) as a backend.  
-Only usable on nightly currently.
+Currently only compiles on nightly and a C++ compiler is required as it depends on the [cc crate](https://crates.io/crates/cc).
 
 ## Supported Codecs
 - MP3  
