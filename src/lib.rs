@@ -107,7 +107,7 @@ pub enum AudioError {
     DeviceError,
     /// Error initializing backend.
     ContextError,
-    /// Catch all error tgat should never occur.
+    /// Catch all error that should never occur.
     /// If it occurs it is a sign of undefined behavior. 
     UnknownError,
 }
@@ -125,7 +125,7 @@ impl fmt::Display for AudioError {
             AudioError::DecoderError => write!(f, "unable to decode file"),
             AudioError::DeviceError => write!(f, "invalid device"),
             AudioError::ContextError => write!(f, "unable to initialize context"),
-            AudioError::UnknownError => write!(f, "unknown error"), //this should never happen
+            AudioError::UnknownError => unreachable!(),
         }
     }
 }
